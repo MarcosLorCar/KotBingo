@@ -101,7 +101,7 @@ fun gameList(): String {
     }
 }
 
-fun newBingoCard(): Array<Int> {
+fun newBingoCard(): MutableList<Int> {
     val numbers = mutableListOf<Int>()
     repeat(15) {
         var num = Random.nextInt(1, 99)
@@ -110,5 +110,5 @@ fun newBingoCard(): Array<Int> {
         }
         numbers.add(num)
     }
-    return numbers.toTypedArray()
+    return numbers
 }

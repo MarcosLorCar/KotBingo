@@ -303,9 +303,18 @@ object BingoClient {
             )
             when (intResponse { it in 1..3 }) {
                 1 -> {
+                    clearScr()
                     serverWriter.println("NUMBER")
                     serverWriter.flush()
                     while (true) {
+                        val num = serverReader.readLine().toInt()
+                        println(
+                            """
+                        ┌────┐
+                        │ ${(if (num < 10) "0" else "") + num} │
+                        └────┘
+                        """.trimIndent()
+                        )
                         val response = serverReader.readLine()
                         when (response.substringBefore(" ")) {
                             "LINE" -> {

@@ -68,18 +68,27 @@ class BingoGame(val host: BingoPlayer) {
                     val newNumber = numbers.random()
                     numbers.remove(newNumber)
 
-                    players.println("NUMBER $newNumber")
+                    hostWriter.println(newNumber)
+                    hostWriter.flush()
+
                     players.forEach {
-                        if (lines.any { player -> player.value == 3 }) return@forEach
-                        if (it.hasBingo()) {
-                            lines[it] = lines[it]!! + 1
-                            players.println("BINGO ${it.displayName}")
-                            hostWriter.println("BINGO ${it.displayName}")
+                        for ((index, i) in it.bingoCard.withIndex()) {
+                            if (i == newNumber) it.bingoCard[index] = -1
+                        }
+                    }
+
+                    players.println("NUMBER $newNumber")
+                    players.forEach { player ->
+                        if (lines.any { it.value == 3 }) return@forEach
+                        if (player.hasBingo()) {
+                            lines[player] = lines[player]!! + 1
+                            players.println("BINGO ${player.displayName}")
+                            hostWriter.println("BINGO ${player.displayName}")
                             hostWriter.flush()
-                        } else if (it.hasLine() > lines[it]!!) {
-                            lines[it] = lines[it]!! + 1
-                            players.println("LINE ${it.displayName};${lines[it]}")
-                            hostWriter.println("LINE ${it.displayName};${lines[it]}")
+                        } else if (player.hasLine() > lines[player]!!) {
+                            lines[player] = lines[player]!! + 1
+                            players.println("LINE ${player.displayName};${lines[player]}")
+                            hostWriter.println("LINE ${player.displayName};${lines[player]}")
                             hostWriter.flush()
                         }
                     }
@@ -110,7 +119,7 @@ class BingoGame(val host: BingoPlayer) {
         bingoGames.remove(this@BingoGame)
     }
 
-    private fun stringFromCard(bingoCard: Array<Int>): String {
+    private fun stringFromCard(bingoCard: List<Int>): String {
         return bingoCard.joinToString(";") { it.toString() }
     }
 }
