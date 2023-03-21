@@ -159,7 +159,7 @@ object BingoClient {
                 break
             }
             when (serverStr.substringBefore(" ")) {
-                 "NUMBER" -> {
+                "NUMBER" -> {
                     clearScr()
                     val num = serverStr.substringAfter(" ").toInt()
                     println(
@@ -252,6 +252,8 @@ object BingoClient {
     private fun hostGame(): Unit = runBlocking(Dispatchers.IO) {
         clearScr()
 
+        var playerCount = 0
+
         serverWriter.println("HOST")
         serverWriter.flush()
         val cancelled = CoroutineScope(Dispatchers.IO).async {
@@ -262,14 +264,21 @@ object BingoClient {
                 (2) Cancel
             """.trimIndent()
             )
-            intResponse { it in 1..2 } == 2
+            var response: Int
+            do {
+                response = intResponse { it in 1..2 }
+                if (response == 2) return@async true
+            } while ((playerCount < 2).also { if (it) println("Cant start game with less than 2 players") })
+            return@async false
         }
 
         while (!cancelled.isCompleted) {
             if (serverReader.ready()) {
                 serverReader.readLine().also {
-                    if (it.substringBefore(" ") == "PLAYER")
+                    if (it.substringBefore(" ") == "PLAYER") {
                         println(it.substringAfter(" "))
+                        playerCount++
+                    }
                 }
             }
             delay(1000)
