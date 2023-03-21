@@ -5,7 +5,7 @@ import java.io.PrintWriter
 import java.net.Socket
 
 data class BingoPlayer(
-    var bingoCard: Array<Array<Int>>,
+    var bingoCard: Array<Int>,
     val writer: PrintWriter,
     val reader: BufferedReader,
     val displayName: String,
@@ -31,5 +31,19 @@ data class BingoPlayer(
         result = 31 * result + reader.hashCode()
         result = 31 * result + displayName.hashCode()
         return result
+    }
+
+    fun hasLine(): Boolean {
+        bingoCard.toList().chunked(5).forEach { line ->
+            if (line.all { it == -1 })
+                return true
+        }
+        return false
+    }
+
+    fun hasBingo(): Boolean = bingoCard.all { it == -1 }
+    fun println(s: String) {
+        writer.println(s)
+        writer.flush()
     }
 }

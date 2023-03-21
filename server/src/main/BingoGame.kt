@@ -1,6 +1,7 @@
 package main
 
 import kotlinx.coroutines.*
+import kotlin.random.Random
 
 class BingoGame(val host: BingoPlayer) {
 
@@ -16,25 +17,21 @@ class BingoGame(val host: BingoPlayer) {
 
     fun playerJoin(player: BingoPlayer) {
         players.add(player)
-        hostWriter.println("${player.displayName} joined ($playerCount/15)")
+        hostWriter.println("PLAYER ${player.displayName} joined ($playerCount/15)")
+        players.println("PLAYER ${player.displayName} joined ($playerCount/15)")
         hostWriter.flush()
     }
 
     private fun playerDisconnect(player: BingoPlayer) {
         players.remove(player)
-        hostWriter.println("${player.displayName} disconnected ($playerCount/15)")
+        hostWriter.println("PLAYER ${player.displayName} disconnected ($playerCount/15)")
+        players.println("PLAYER ${player.displayName} disconnected ($playerCount/15)")
         hostWriter.flush()
     }
 
-    init {
-        CoroutineScope(Dispatchers.IO).launch {
-            gameHandler()
-        }
-    }
-
-    private fun gameHandler() = runBlocking {
+    fun gameHandle() = runBlocking(Dispatchers.IO) {
         val cancelled = async(Dispatchers.IO) {
-            when(hostReader.readLine()) {
+            when (hostReader.readLine()) {
                 "START" -> false
                 "CANCEL" -> true
                 else -> true
@@ -54,13 +51,58 @@ class BingoGame(val host: BingoPlayer) {
             return@runBlocking
         }
         playing = true
+        for (player in players) {
+            player.println("START ${stringFromCard(player.bingoCard)}")
+        }
+        // Game start
+        val lines: MutableMap<BingoPlayer, Int> = players.associateWith { 0 } as MutableMap<BingoPlayer, Int>
+        while (true) {
+            when (hostReader.readLine()) {
+                "NUMBER" -> {
+                    val newNumber = Random.nextInt(1,99)
+                    players.println("NUMBER $newNumber")
+                    players.forEach {
+                        if (lines.any { player -> player.value == 3 }) return@forEach
+                        if (it.hasBingo()) {
+                            lines[it] = lines[it]!! + 1
+                            players.println("BINGO ${it.displayName}")
+                            hostWriter.println("BINGO ${it.displayName}")
+                            hostWriter.flush()
+                        } else if (it.hasLine()) {
+                            lines[it] = lines[it]!! + 1
+                            players.println("LINE ${it.displayName};${lines[it]}")
+                            hostWriter.println("LINE ${it.displayName};${lines[it]}")
+                            hostWriter.flush()
+                        }
+                    }
+                    if (lines.any { it.value == 3 })
+                        break
+                    hostWriter.println("NEXT")
+                    hostWriter.flush()
+                }
 
-        //End of game
+                "PLAYERS" -> {
+                    players.forEach {
+                        hostWriter.println("PLAYER ${it.displayName};${lines[it]}")
+                        hostWriter.flush()
+                    }
+                    hostWriter.println("NEXT")
+                    hostWriter.flush()
+                }
+                "END" -> {
+                    players.println("END")
+                    break
+                }
+            }
+        }
+
+        playing = false
+        // Game end
         bingoGames.remove(this@BingoGame)
     }
 
-    private fun winner(): BingoPlayer? {
-        return null
+    private fun stringFromCard(bingoCard: Array<Int>): String {
+        return bingoCard.joinToString(";") { it.toString() }
     }
 }
 

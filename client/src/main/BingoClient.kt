@@ -1,17 +1,15 @@
 package main
 
 import kotlinx.coroutines.*
-import java.io.BufferedReader
-import java.io.File
-import java.io.IOError
-import java.io.IOException
-import java.io.InputStreamReader
-import java.io.PrintWriter
+import java.io.*
 import java.net.Socket
 import java.util.*
 import kotlin.system.exitProcess
 
-fun main() = BingoClient.menu()
+fun main() {
+    clearScr()
+    BingoClient.menu()
+}
 
 object BingoClient {
     private var displayName: String
@@ -28,9 +26,9 @@ object BingoClient {
                 this.createNewFile()
                 this.writeText(
                     """
-                name =
-                server-ip =
-                server-port =
+                name = Player
+                server-ip = 0.0.0.0
+                server-port = 0
             """.trimIndent()
                 )
             }
@@ -38,7 +36,7 @@ object BingoClient {
                 displayName = this["name"]?.toString() ?: ""
                     .ifEmpty { "Player${Random().nextInt(1000, 9999)}" }
                 ip = this["server-ip"]?.toString() ?: ""
-                    .ifEmpty { "127.0.0.1" }
+                    .ifEmpty { "0.0.0.0" }
                 port = this["server-port"].toString().toIntOrNull() ?: 0
             }
         }
@@ -92,13 +90,19 @@ object BingoClient {
         var response: Int
         do {
             response = intResponse { it in 1..games.size + 1 }
-                .also { if (it == games.size + 1) {
-                    println("Cancelled") //DEBUG
-                    return
-                } }
+                .also {
+                    if (it == games.size + 1) {
+                        println("Cancelled") //DEBUG
+                        return
+                    }
+                }
         } while (
             (games[response - 1].second == 15).also {
                 if (it) println("That game is already full")
+            }
+            ||
+            games[response - 1].third.also {
+                if (it) println("That game is running")
             }
         )
 
@@ -108,7 +112,7 @@ object BingoClient {
         serverWriter.println("JOIN $response")
         serverWriter.flush()
 
-        when(serverReader.readLine()) {
+        when (serverReader.readLine()) {
             "JOINED" -> play()
             "ERROR" -> {
                 println("Something went wrong...")
@@ -117,8 +121,132 @@ object BingoClient {
         }
     }
 
-    private fun play() {
-        TODO()
+    private fun play() = runBlocking(Dispatchers.IO) {
+        clearScr()
+        println("Joined the game")
+
+        val str = async(Dispatchers.IO) {
+            var str: String
+            while (true) {
+                str = serverReader.readLine()
+                if (str.substringBefore(" ") == "PLAYER")
+                    println(str.substringAfter(" "))
+                else
+                    break
+            }
+            return@async str
+        }
+
+        var cardStr: String
+
+        if (str.await().also { cardStr = it.substringAfter(" ") } == "CANCEL") {
+            println("Game cancelled")
+            return@runBlocking
+        }
+        //Game start
+
+        val bingoCard = cardFromString(cardStr)
+
+        clearScr()
+        println("Game started")
+        printBingoCard(bingoCard)
+
+
+        while (true) {
+            val serverStr = serverReader.readLine()
+            if (serverStr == null) {
+                println("Something went wrong...")
+                break
+            }
+            when (serverStr.substringBefore(" ")) {
+                 "NUMBER" -> {
+                    clearScr()
+                    val num = serverStr.substringAfter(" ").toInt()
+                    println(
+                        """
+                        ┌────┐
+                        │ ${(if (num < 10) "0" else "") + num} │
+                        └────┘
+                        """.trimIndent()
+                    )
+                    val prevLines = hasLine(bingoCard)
+                    for ((index, i) in bingoCard.withIndex()) {
+                        if (i == num) bingoCard[index] = -1
+                    }
+                    printBingoCard(bingoCard)
+                    if (hasBingo(bingoCard)) {
+                        println("You got bingo!")
+                        break
+                    } else if (hasLine(bingoCard) != prevLines) {
+                        println("You got line!")
+                    }
+                }
+
+                "LINE" -> {
+                    val name = serverStr.substringAfter(" ").split(";")[0]
+                    val count = serverStr.substringAfter(" ").split(";")[1]
+                    println("$name  got line! ($count/3)")
+                }
+
+                "BINGO" -> {
+                    val name = serverStr.substringAfter(" ")
+                    println("$name  got bingo!")
+                    break
+                }
+
+                "END" -> {
+                    println("Game terminated by host")
+                    break
+                }
+            }
+        }
+
+        println("Game ended. Returning in 5s")
+
+        launch {
+            delay(5000)
+        }.also { it.join() }
+        clearScr()
+        // Game end
+    }
+
+    private fun printBingoCard(bingoCard: List<Int>) {
+        val formattedNumbers = bingoCard.map {
+            if (it == -1) {
+                "XX"
+            } else if (it < 10) {
+                "0$it"
+            } else {
+                it.toString()
+            }
+        }
+        println(
+            """
+        ┌────┬────┬────┬────┬────┐
+        │ ${formattedNumbers[0]} │ ${formattedNumbers[1]} │ ${formattedNumbers[2]} │ ${formattedNumbers[3]} │ ${formattedNumbers[4]} │
+        ├────┼────┼────┼────┼────┤
+        │ ${formattedNumbers[5]} │ ${formattedNumbers[6]} │ ${formattedNumbers[7]} │ ${formattedNumbers[8]} │ ${formattedNumbers[9]} │
+        ├────┼────┼────┼────┼────┤
+        │ ${formattedNumbers[10]} │ ${formattedNumbers[11]} │ ${formattedNumbers[12]} │ ${formattedNumbers[13]} │ ${formattedNumbers[14]} │
+        └────┴────┴────┴────┴────┘
+    """.trimIndent()
+        )
+    }
+
+    private fun hasLine(bingoCard: List<Int>): Int {
+        var lines = 0
+        bingoCard.toList().chunked(5).forEach { line ->
+            if (line.all { it == -1 })
+                lines++
+        }
+        return lines
+    }
+
+    private fun hasBingo(bingoCard: List<Int>): Boolean = bingoCard.all { it == -1 }
+
+
+    private fun cardFromString(cardStr: String): MutableList<Int> {
+        return cardStr.split(";").map { it.toInt() } as MutableList<Int>
     }
 
     private fun hostGame(): Unit = runBlocking(Dispatchers.IO) {
@@ -127,29 +255,22 @@ object BingoClient {
         serverWriter.println("HOST")
         serverWriter.flush()
         val cancelled = CoroutineScope(Dispatchers.IO).async {
-            println("""
+            println(
+                """
                 Waiting for players...
                 (1) Start game
                 (2) Cancel
-            """.trimIndent())
-            return@async when(intResponse { it in 1..2 }) {
-                1 -> {
-                    serverWriter.println("START")
-                    serverWriter.flush()
-                    false
-                }
-                2 -> {
-                    serverWriter.println("CANCEL")
-                    serverWriter.flush()
-                    true
-                }
-                else -> throw IOException()
-            }
+            """.trimIndent()
+            )
+            intResponse { it in 1..2 } == 2
         }
 
         while (!cancelled.isCompleted) {
             if (serverReader.ready()) {
-                serverReader.readLine().also { println(it) }
+                serverReader.readLine().also {
+                    if (it.substringBefore(" ") == "PLAYER")
+                        println(it.substringAfter(" "))
+                }
             }
             delay(1000)
         }
@@ -159,10 +280,67 @@ object BingoClient {
             serverWriter.flush()
             return@runBlocking
         }
-
         serverWriter.println("START")
         serverWriter.flush()
 
+        clearScr()
+        while (true) {
+            println(
+                """
+                (1) New number
+                (2) Player list
+                (3) End game
+            """.trimIndent()
+            )
+            when (intResponse { it in 1..3 }) {
+                1 -> {
+                    serverWriter.println("NUMBER")
+                    serverWriter.flush()
+                    while (true) {
+                        val response = serverReader.readLine()
+                        when (response.substringBefore(" ")) {
+                            "LINE" -> {
+                                val name = response.substringAfter(" ").split(";")[0]
+                                val count = response.substringAfter(" ").split(";")[1]
+                                println("$name got a line! ($count/3)")
+                            }
+
+                            "BINGO" -> {
+                                val name = response.substringAfter(" ")
+                                println("$name got bingo!")
+                                break
+                            }
+
+                            "NEXT" -> break
+                        }
+                    }
+                }
+
+                2 -> {
+                    serverWriter.println("PLAYERS")
+                    serverWriter.flush()
+                    while (true) {
+                        val response = serverReader.readLine()
+                        when (response.substringBefore(" ")) {
+                            "PLAYER" -> {
+                                val name = response.substringAfter(" ").split(";")[0]
+                                val count = response.substringAfter(" ").split(";")[1]
+                                println("- $name with $count/3 lines")
+                            }
+
+                            "NEXT" -> break
+                        }
+                    }
+                }
+
+                3 -> {
+                    serverWriter.println("END")
+                    serverWriter.flush()
+                    clearScr()
+                    break
+                }
+            }
+        }
 
         // Game ended
     }
@@ -194,5 +372,5 @@ object BingoClient {
 }
 
 fun clearScr() {
-    ProcessBuilder("cmd","/c","cls").inheritIO().start().waitFor()
+    ProcessBuilder("cmd", "/c", "cls").inheritIO().start().waitFor()
 }

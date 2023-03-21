@@ -1,6 +1,8 @@
 package main
 
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.PrintWriter
@@ -77,25 +79,29 @@ fun handleClient(socket: Socket) {
                     bingoGames[gameIndex].playerJoin(player)
                 }
             }
+
             "HOST" -> {
-                bingoGames.add(BingoGame(player))
+                val newBingoGame = BingoGame(player)
+                bingoGames.add(newBingoGame)
+                newBingoGame.gameHandle()
+                println("ENDED GAME ?")
             }
         }
     }
 }
 
 fun clearScr() {
-    ProcessBuilder("cmd","/c","cls").inheritIO().start().waitFor()
+    ProcessBuilder("cmd", "/c", "cls").inheritIO().start().waitFor()
 }
 
 fun gameList(): String {
     if (bingoGames.isEmpty()) return "EMPTY"
-    bingoGames.map {
+    return bingoGames.joinToString("") {
         "${it.host.displayName};${it.playerCount};${it.playing}#"
-    }.also { return it.joinToString() }
+    }
 }
 
-fun newBingoCard(): Array<Array<Int>> {
+fun newBingoCard(): Array<Int> {
     val numbers = mutableListOf<Int>()
     repeat(15) {
         var num = Random.nextInt(1, 99)
@@ -104,9 +110,5 @@ fun newBingoCard(): Array<Array<Int>> {
         }
         numbers.add(num)
     }
-    return arrayOf(
-        numbers.subList(0, 4).toTypedArray(),
-        numbers.subList(5, 9).toTypedArray(),
-        numbers.subList(10, 14).toTypedArray()
-    )
+    return numbers.toTypedArray()
 }
