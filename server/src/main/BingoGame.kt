@@ -1,7 +1,6 @@
 package main
 
 import kotlinx.coroutines.*
-import kotlin.random.Random
 
 class BingoGame(val host: BingoPlayer) {
 
@@ -54,12 +53,21 @@ class BingoGame(val host: BingoPlayer) {
         for (player in players) {
             player.println("START ${stringFromCard(player.bingoCard)}")
         }
+
+        val numbers = mutableListOf<Int>()
+
+        for (i in 1..99) {
+            numbers.add(i)
+        }
+
         // Game start
         val lines: MutableMap<BingoPlayer, Int> = players.associateWith { 0 } as MutableMap<BingoPlayer, Int>
         while (true) {
             when (hostReader.readLine()) {
                 "NUMBER" -> {
-                    val newNumber = Random.nextInt(1,99)
+                    val newNumber = numbers.random()
+                    numbers.remove(newNumber)
+
                     players.println("NUMBER $newNumber")
                     players.forEach {
                         if (lines.any { player -> player.value == 3 }) return@forEach
@@ -68,7 +76,7 @@ class BingoGame(val host: BingoPlayer) {
                             players.println("BINGO ${it.displayName}")
                             hostWriter.println("BINGO ${it.displayName}")
                             hostWriter.flush()
-                        } else if (it.hasLine()) {
+                        } else if (it.hasLine() > lines[it]!!) {
                             lines[it] = lines[it]!! + 1
                             players.println("LINE ${it.displayName};${lines[it]}")
                             hostWriter.println("LINE ${it.displayName};${lines[it]}")
@@ -89,6 +97,7 @@ class BingoGame(val host: BingoPlayer) {
                     hostWriter.println("NEXT")
                     hostWriter.flush()
                 }
+
                 "END" -> {
                     players.println("END")
                     break

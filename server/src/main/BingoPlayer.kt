@@ -33,12 +33,13 @@ data class BingoPlayer(
         return result
     }
 
-    fun hasLine(): Boolean {
+    fun hasLine(): Int {
+        var lines = 0
         bingoCard.toList().chunked(5).forEach { line ->
             if (line.all { it == -1 })
-                return true
+                lines++
         }
-        return false
+        return lines
     }
 
     fun hasBingo(): Boolean = bingoCard.all { it == -1 }
