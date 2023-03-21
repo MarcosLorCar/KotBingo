@@ -293,7 +293,7 @@ object BingoClient {
         serverWriter.flush()
 
         clearScr()
-        while (true) {
+        game@ while (true) {
             println(
                 """
                 (1) New number
@@ -306,15 +306,15 @@ object BingoClient {
                     clearScr()
                     serverWriter.println("NUMBER")
                     serverWriter.flush()
-                    while (true) {
-                        val num = serverReader.readLine().toInt()
-                        println(
-                            """
+                    val num = serverReader.readLine().toInt()
+                    println(
+                        """
                         ┌────┐
                         │ ${(if (num < 10) "0" else "") + num} │
                         └────┘
                         """.trimIndent()
-                        )
+                    )
+                    while (true) {
                         val response = serverReader.readLine()
                         when (response.substringBefore(" ")) {
                             "LINE" -> {
@@ -326,7 +326,7 @@ object BingoClient {
                             "BINGO" -> {
                                 val name = response.substringAfter(" ")
                                 println("$name got bingo!")
-                                break
+                                break@game
                             }
 
                             "NEXT" -> break
@@ -360,7 +360,14 @@ object BingoClient {
             }
         }
 
-        // Game ended
+
+        println("Game ended. Returning in 5s")
+
+        launch {
+            delay(5000)
+        }.also { it.join() }
+        clearScr()
+        // Game end
     }
 
     fun menu() {
